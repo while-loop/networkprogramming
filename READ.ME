@@ -1,0 +1,40 @@
+INTRODUCTION
+============
+This program runs a server that stores projects with their respected tasks. The program stores this information into a SQLite database.
+
+COMPILATION
+============
+To compile the program, run the make command in the root directory.
+
+RUNNING
+============
+To run the server, execute one of the 3 commands:
+(To run the server in the background append each command with a '&' character)
+./run.sh &
+./run.sh <portNumber> &
+./run.sh <portNumber> <dbFilePath> &
+
+To run a preset queries using TCP, execute one of the 2 commands:
+./script1.sh
+./script1.sh <port>
+
+To send custom queries to the server using TCP, execute one of the 2 commands:
+The script will wait for user input to communicate with the server.
+./script2.sh
+./script2.sh <port>
+
+To run a preset queries using UDP, execute one of the 2 commands:
+./script1udp.sh
+./script1udp.sh <port>
+
+To test the expiration feature using UDP, execute one of the 2 commands:
+./script2udp.sh
+./script2udp.sh <hostname> <port>
+
+
+MORE INFO
+============
+Additional make commands:
+make			// compiles the java source code
+make clean		// removes all the .class files and bin folder
+make rebuild	// combonation of clean and make

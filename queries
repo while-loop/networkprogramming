@@ -1,0 +1,6 @@
+PROJECT_DEFINITION:Milestone 2;TASKS:3;Create Server;2016-03-12:18h30m00s001Z;2016-03-13:18h30m00s001Z;Create Database;2016-03-14:18h30m00s001Z;2016-03-15:18h30m00s001Z;Create java.Client;2016-03-16:18h30m00s001Z;2016-03-17:18h30m00s001Z;
+TAKE;USER:Anthony;PROJECT:Milestone 2;Create Server
+TAKE;USER:Sally;PROJECT:Milestone 2;Create java.Client
+TAKE;USER:Anthony;PROJECT:Milestone 2;Create Database
+GET_PROJECTS
+GET_PROJECT;Milestone 2
