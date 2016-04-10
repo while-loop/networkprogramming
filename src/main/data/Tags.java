@@ -21,6 +21,8 @@
 
 package main.data;
 
+import main.ASN1.Encoder;
+
 /**
  * Class to keep constants
  */
@@ -52,5 +54,31 @@ public class Tags {
 
     public static final String SD_FORMAT = "yyyy-MM-dd:hh'h'mm'm'ss's'SSS'Z'";
 
+
+    public static final byte TAG_AP0 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 0);
+    public static final byte TAG_AP1 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 1);
+    public static final byte TAG_AP2 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 2);
+    public static final byte TAG_AP3 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 3);
+    public static final byte TAG_AP4 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 4);
+    public static final byte TAG_AP5 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 5);
+    public static final byte TAG_AP6 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 6);
+    public static final byte TAG_AP7 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 7);
+    public static final byte TAG_AP8 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 8);
+    public static final byte TAG_AP9 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_PRIMITIVE, (byte) 9);
+
+    public static final byte TAG_AC0 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_CONSTRUCTED, (byte) 0);
+    public static final byte TAG_AC1 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_CONSTRUCTED, (byte) 1);
+    public static final byte TAG_AC2 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_CONSTRUCTED, (byte) 2);
+    public static final byte TAG_AC3 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_CONSTRUCTED, (byte) 3);
+    public static final byte TAG_AC4 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_CONSTRUCTED, (byte) 4);
+    public static final byte TAG_AC5 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_CONSTRUCTED, (byte) 5);
+    public static final byte TAG_AC6 = asn1Type(Encoder.CLASS_APPLICATION, Encoder.PC_CONSTRUCTED, (byte) 6);
+
+    public static byte asn1Type(int classASN1, int PCASN1, byte tag_number) {
+        if ((tag_number & 0x1F) >= 31) {
+            tag_number = 25;
+        }
+        return (byte) ((classASN1 << 6) + (PCASN1 << 5) + tag_number);
+    }
 
 }

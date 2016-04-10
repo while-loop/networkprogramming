@@ -1,15 +1,19 @@
 package main.data;
 
+import main.ASN1.ASN1DecoderFail;
+import main.ASN1.ASNObj;
+import main.ASN1.Decoder;
 import main.db.MyDB;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.text.ParseException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Parser {
 
-    static MyDB myDB;
+    private static MyDB myDB;
     String clientIP;
     int clientPort;
 
@@ -21,66 +25,78 @@ public class Parser {
 
     }
 
-    public void close(){
+    public int getClientPort() {
+        return clientPort;
+    }
+
+    public String getClientIP() {
+        return clientIP;
+    }
+
+    public void close() {
         if (myDB != null) {
             myDB.disconnect();
         }
     }
 
-    public String processInput(String input) {
-        return processInput(input, this.clientIP, this.clientPort);
+    public static MyDB getDb() {
+        return myDB;
     }
 
-        /**
-         * Parse and process a command given by the client.
-         * Currently supports 4 commands:
-         * PROJECT_DEFINITION
-         * TAKE
-         * GET_PROJECTS
-         * GET_PROJECT
-         *
-         * @param input - raw command input given by the client
-         * @return - string to return back to the client depending on the command given
-         */
-    public String processInput(String input, String ip, int port) {
-        String status = Tags.OK_TAG; // status tag to send back to the client. OK/FAIL
-        String verb = getVerb(input);
-        if (verb.equals(Tags.TAKE_TAG)) { // assign user to a task
-            try {
-                String[] info = getUserInfo(input);
-                int rows = myDB.assignUser(info[0], info[1], info[2], ip, port);
-                if (rows < 1)
-                    status = Tags.FAIL_TAG;
-            } catch (SQLException e) {
-                status = Tags.FAIL_TAG;
-            }
-        } else if (verb.equals(Tags.GET_PROJECT_TAG)) { // all information about a task
-            try {
-                input = myDB.getProject(getTitle(input));
-            } catch (SQLException e) {
-                status = Tags.FAIL_TAG;
-            }
-        } else if (verb.equals(Tags.GET_PROJECTS_TAG)) { // get count of projects and their names
-            try {
-                input = myDB.getProjects();
-            } catch (SQLException e) {
-                System.err.println(e.toString());
-                status = Tags.FAIL_TAG;
-            }
-        } else if (verb.equals(Tags.PROJECT_DEFINITION_TAG)) { // add a project to the database
-            try {
-                myDB.addProject(input);
-            } catch (Exception e) {
-                System.err.println("Unable to add project.");
-                System.err.println(e.toString());
-                status = Tags.FAIL_TAG;
-            }
-        } else {
-            status = Tags.FAIL_TAG;
-        }
-
-        return (status + ";" + input);
-    }
+//    public String processInput(String input) {
+//        return processInput(input, this.clientIP, this.clientPort);
+//    }
+//
+//    /**
+//     * Parse and process a command given by the client.
+//     * Currently supports 4 commands:
+//     * PROJECT_DEFINITION
+//     * TAKE
+//     * GET_PROJECTS
+//     * GET_PROJECT
+//     *
+//     * @param input - raw command input given by the client
+//     * @return - string to return back to the client depending on the command given
+//     */
+//    public String processInput(String input, String ip, int port) {
+//        String status = Tags.OK_TAG; // status tag to send back to the client. OK/FAIL
+//        String verb = getVerb(input);
+//        if (verb.equals(Tags.TAKE_TAG)) { // assign user to a task
+//            try {
+//                String[] info = getUserInfo(input);
+//                int rows = myDB.assignUser(info[0], info[1], info[2], ip, port);
+//                if (rows < 1)
+//                    status = Tags.FAIL_TAG;
+//            } catch (SQLException e) {
+//                status = Tags.FAIL_TAG;
+//            }
+//        } else if (verb.equals(Tags.GET_PROJECT_TAG)) { // all information about a task
+//            try {
+//                input = myDB.getProject(getTitle(input));
+//            } catch (SQLException e) {
+//                status = Tags.FAIL_TAG;
+//            }
+//        } else if (verb.equals(Tags.GET_PROJECTS_TAG)) { // get count of projects and their names
+//            try {
+//                input = myDB.getProjects();
+//            } catch (SQLException e) {
+//                System.err.println(e.toString());
+//                status = Tags.FAIL_TAG;
+//            }
+//        } else if (verb.equals(Tags.PROJECT_DEFINITION_TAG)) { // add a project to the database
+//            try {
+//                myDB.addProject(input);
+//            } catch (Exception e) {
+//                System.err.println("Unable to add project.");
+//                System.err.println(e.toString());
+//                status = Tags.FAIL_TAG;
+//            }
+//        } else {
+//            status = Tags.FAIL_TAG;
+//        }
+//
+//        return (status + ";" + input);
+//    }
 
     /**
      * Parse user information when adding a user to a specific task.
@@ -141,7 +157,7 @@ public class Parser {
      * @param input - raw input from the client
      * @return - the verb
      */
-    private String getVerb(String input) {
+    public static String getVerb(String input) {
         Pattern verbPattern = Pattern.compile("([^;^:^\r^\n]*)");
 
         Matcher m = verbPattern.matcher(input);
@@ -156,5 +172,32 @@ public class Parser {
     public void setClientInfo(String hostAddress, int localPort) {
         this.clientIP = hostAddress;
         this.clientPort = localPort;
+    }
+
+    public static ASNObj processBytes(byte[] inBytes, int bytesRead) throws ASN1DecoderFail {
+        Decoder dec = new Decoder(inBytes, 0, bytesRead);
+
+        ASNObj serverResponse = null;
+        if (dec.getTypeByte() == Tags.TAG_AC1) serverResponse = new Project().decode(dec);
+        if (dec.getTypeByte() == Tags.TAG_AC2) serverResponse = new Events.Projects().decode(dec);
+        if (dec.getTypeByte() == Tags.TAG_AC4) serverResponse = new Events.GetProject().decode(dec);
+        if (dec.getTypeByte() == Tags.TAG_AC5) serverResponse = new Events.Take().decode(dec);
+        return serverResponse;
+    }
+
+    public static ASNObj getAsnObjResponse(ASNObj inObj, String ip, int port) throws SQLException, ParseException {
+        ASNObj response = null;
+        if (inObj != null) {
+            if (inObj instanceof Events.GetProject) {
+                response = Parser.getDb().getProject((Events.GetProject) inObj);
+            } else if (inObj instanceof Events.Projects) {
+                response = Parser.getDb().getProjects();
+            } else if (inObj instanceof Events.Take) {
+                response = Parser.getDb().assignUser((Events.Take) inObj, ip, port);
+            } else if (inObj instanceof Project) {
+                response = Parser.getDb().addProject((Project) inObj);
+            }
+        }
+        return response;
     }
 }

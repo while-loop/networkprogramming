@@ -27,7 +27,7 @@ public class ProjectTest {
     public void setUp() throws Exception {
         date = CalHelper.getCalendar("2016-03-18:18h30m00s001Z");
         for (int i = 0; i < 10; i++) {
-            mTasks.add(new Task(taskPrefix + i, date, date, ip, port, done));
+            mTasks.add(new Task(taskPrefix + i, date, date, null, ip, port, done));
         }
         mProject = new Project(projectName, mTasks);
     }

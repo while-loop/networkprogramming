@@ -15,4 +15,4 @@ if [ -n "$2" ]
 fi
 
 cd bin/
-java -classpath ".:../lib/*" java.Main -d $sqliteFile -p $port
+java -classpath ".:../lib/*" main/Server -d $sqliteFile -p $port

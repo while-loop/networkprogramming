@@ -14,22 +14,18 @@ To run the server, execute one of the 3 commands:
 ./run.sh <portNumber> &
 ./run.sh <portNumber> <dbFilePath> &
 
-To run a preset queries using TCP, execute one of the 2 commands:
-./script1.sh
-./script1.sh <port>
+To run a preset queries using TCP or UDP, execute one of the scripts:
+./script1ASN_TCP.sh
+./script1ASN_UDP.sh
 
-To send custom queries to the server using TCP, execute one of the 2 commands:
+To send custom queries to the server using TCP or UDP, execute one of the scripts:
 The script will wait for user input to communicate with the server.
-./script2.sh
-./script2.sh <port>
+./script2ASN_TCP.sh
+./script2ASN_UDP.sh
 
-To run a preset queries using UDP, execute one of the 2 commands:
-./script1udp.sh
-./script1udp.sh <port>
 
-To test the expiration feature using UDP, execute one of the 2 commands:
-./script2udp.sh
-./script2udp.sh <hostname> <port>
+To connect to any server run the client script:
+./client.sh [-t|-u] <hostname> <port> 
 
 
 MORE INFO

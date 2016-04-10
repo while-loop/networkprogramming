@@ -27,7 +27,7 @@ public class TaskTest {
     public void setUp() throws ParseException {
 //        start = CalHelper.getCalendar(dateString);
 //        end = CalHelper.getCalendar(dateString);
-        mTask = new Task(name, null, null, ip, port, done);
+        mTask = new Task(name, null, null, null, ip, port, done);
     }
 
     @Test

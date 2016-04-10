@@ -21,9 +21,14 @@
 
 package main.conn;
 
+import main.ASN1.ASN1DecoderFail;
+import main.ASN1.ASNObj;
+import main.data.Events;
 import main.data.Parser;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 
 /**
@@ -31,7 +36,7 @@ import java.net.Socket;
  * The handler contains the SQLite Database object in a static field to be shared among all clients.
  */
 public class TCPClientHandler extends Thread {
-    
+
     /* Socket object of the connected client */
     private Socket mClient;
 
@@ -42,7 +47,6 @@ public class TCPClientHandler extends Thread {
      * Create a handler object for a Client
      *
      * @param client - Socket of the connected client
-     * @param db     - database object for the connected client
      */
     public TCPClientHandler(Socket client, Parser parser) {
         this.mClient = client;
@@ -62,39 +66,59 @@ public class TCPClientHandler extends Thread {
     public void run() {
         super.run();
 
-        BufferedReader in;
-        BufferedWriter out = null;
+        InputStream in;
+        OutputStream out;
         try {
-            in = new BufferedReader(new InputStreamReader(mClient.getInputStream()));
-            out = new BufferedWriter(new OutputStreamWriter(mClient.getOutputStream()));
+            in = mClient.getInputStream();
+            out = mClient.getOutputStream();
         } catch (IOException e) {
             System.err.println("Unable to connect to intput/output stream.\n" + e.toString());
             return;
         }
 
 
-        String input = "", output;
         while (mClient.isConnected() && !mClient.isClosed()) {
+            final byte inBytes[] = new byte[65536];
+            int bytesRead;
             try {
                 // read input from the client. (MUST end in a \n)
-                input = in.readLine();
+                bytesRead = in.read(inBytes);
             } catch (IOException e) {
-                System.err.println("Unable to read input stream.\n" + e.toString());
+                //System.err.println("Unable to read input stream.\n" + e.toString());
+                break;
             }
 
-            if (input == null) {
+            if (bytesRead == 0) {
                 break;
             }
 
             // parse and process the command given by the client
-            output = mParser.processInput(input);
+            ASNObj asnObj;
+            try {
+                asnObj = Parser.processBytes(inBytes, bytesRead);
+            } catch (ASN1DecoderFail asn1DecoderFail) {
+                System.err.println("Unable to parse client ASN1");
+                break;
+            }
+
+            ASNObj response = null;
+            try {
+                response = Parser.getAsnObjResponse(asnObj, mParser.getClientIP(), mParser.getClientPort());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
             try {
                 // write back to the client. including the \n char
-                out.write(output + "\n");
+                if (response != null) {
+                    out.write(response.encode());
+                } else {
+                    out.write(new Events.ProjectOK(-1).encode());
+                }
                 out.flush();
             } catch (IOException e) {
-                System.err.println("Unable to write to the output stream.\n" + e.toString());
+                //System.err.println("Unable to write to the output stream.\n" + e.toString());
+                break;
             } catch (NullPointerException e) {
                 // client dc
                 break;

@@ -21,12 +21,18 @@
 
 package main.db;
 
+import main.data.Events;
+import main.data.Project;
 import main.data.Tags;
+import main.data.Task;
+import main.utils.CalHelper;
 
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
 import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.regex.Matcher;
@@ -168,38 +174,8 @@ public class MyDB {
     }
 
     /**
-     * Gets all the Projects saved in the database. The information returned only contains
-     * the titles of each Project.
+     * DEPRECATED - use "Project getProject(Events.GetProject obj)"
      *
-     * @return - string containing all the project titles separated by the ';' character
-     * @throws SQLException - raises exception if the SQL command was not able to execute
-     */
-    public String getProjects() throws SQLException {
-
-        // select all from the projects table
-        String sql = "SELECT " + TITLE_ID + " " +
-                "FROM " + PROJECTS_TABLE;
-
-        // sql escape using PreparedStatement. prevent sql injection
-        PreparedStatement ps = mConnection.prepareStatement(sql);
-        ResultSet rs = ps.executeQuery();
-
-        // append the exam titles to a string, and get the count
-        String exams = "";
-        int count = 0;
-        while (rs.next()) {
-            exams += ";" + rs.getString(TITLE_ID);
-            count++;
-        }
-
-        // example output format: PROJECTS:2;Exam;Enigma
-        String result = Tags.PROJECTS_TAG + ":" + count + exams;
-        ps.close();
-        rs.close();
-        return result;
-    }
-
-    /**
      * @param projectTitle - Title of the project to get information on
      * @return - String content containing information on the Project and any Tasks associated with it
      * @throws SQLException - raises exception if the SQL command was not able to execute
@@ -378,5 +354,171 @@ public class MyDB {
         int rows = ps.executeUpdate();
         ps.close();
         return rows;
+    }
+
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    //                                    ASN1 Methods                                   //
+    //////////////////////////////////////////////////////////////////////////////////////
+    public Events.ProjectOK addProject(Project obj) throws ParseException, SQLException {
+
+        String title = obj.getmName();
+        ArrayList<Task> tasks = obj.getmTasks();
+
+        // generate the SQL command to insert the Project
+        String sql = "INSERT INTO " + PROJECTS_TABLE + " values(?, ?)";
+        PreparedStatement ps = mConnection.prepareStatement(sql);
+        // index #1 is the autoincrementing id
+        ps.setString(2, title);         // title
+        ps.executeUpdate();
+        ps.close();
+
+        // process the task list (if the project has tasks)
+        if (tasks != null && tasks.size() > 0) {
+            // get the ID of the inserted project
+            ps = mConnection.prepareStatement("SELECT " + PROJECT_ID + " FROM " + PROJECTS_TABLE + " WHERE " + TITLE_ID + " = ? ");
+            ps.setString(1, title);
+            ResultSet rs = ps.executeQuery();
+            int projectId = -1;
+            while (rs.next()) {
+                projectId = rs.getInt(PROJECT_ID);
+            }
+            ps.close();
+            rs.close();
+
+            for (Task task : tasks) {
+                // Enter only part of the task. User info is set in a different command
+                sql = "INSERT INTO " + TASKS_TABLE + " (" + PROJECT_ID + ", " + TITLE_ID +
+                        ", " + START_ID + ", " + END_ID + ", " + STATUS_ID + ") VALUES (?, ?, ?, ?, ?)";
+                ps = mConnection.prepareStatement(sql);
+                ps.setInt(1, projectId);                                // project_id
+                ps.setString(2, task.getName());     // title
+                ps.setString(3, CalHelper.getStringDate(task.getStart()));     // start
+                ps.setString(4, CalHelper.getStringDate(task.getEnd()));     // end
+                ps.setString(5, Tags.WAITING_TAG);                      // status
+                ps.executeUpdate();
+                ps.close();
+            }
+        }
+        return new Events.ProjectOK(0, obj);
+    }
+
+    public Events.ProjectOK getProject(Events.GetProject obj) throws SQLException, ParseException {
+        String projectTitle = obj.getmName();
+
+        // check the java.db to update any task status if its end date has passed
+        checkDate();
+
+        /* Get the information about the Project. Tasks are selected later in the method */
+        String sql = "SELECT *, (" +
+                "SELECT count(*) " +
+                "FROM " + TASKS_TABLE + " " +
+                "WHERE " + TASKS_TABLE + "." + PROJECT_ID + " = " + PROJECTS_TABLE + "." + PROJECT_ID + ") AS task_size " +
+                "FROM " + PROJECTS_TABLE + " " +
+                "WHERE " + PROJECTS_TABLE + "." + TITLE_ID + " = ?";
+        PreparedStatement ps = mConnection.prepareStatement(sql);
+        ps.setString(1, projectTitle);
+        ResultSet rs = ps.executeQuery();
+
+        int projectId = -1;
+        while (rs.next()) {
+            projectId = rs.getInt(PROJECT_ID);
+        }
+        ps.close();
+        rs.close();
+
+        if (projectId == -1) {
+            throw new SQLException("Unable to find project: " + projectTitle);
+        }
+
+        ArrayList<Task> tasks = getProjectTasks(projectId);
+
+        return new Events.ProjectOK(0, new Project(projectTitle, tasks));
+    }
+
+    private ArrayList<Task> getProjectTasks(int projectId) throws SQLException, ParseException {
+        /* Get information on each task for the project */
+        String sql = "SELECT * FROM " + TASKS_TABLE + " " +
+                "WHERE " + PROJECT_ID + " = ?";
+
+        PreparedStatement ps = mConnection.prepareStatement(sql);
+        ps.setInt(1, projectId);
+        ResultSet rs = ps.executeQuery();
+
+        // append each result task to the tasks string
+        ArrayList<Task> tasks = new ArrayList<>();
+        while (rs.next()) {
+            // title;start;end;user;ip;port;status
+            String title = rs.getString(TITLE_ID);
+            Calendar start = CalHelper.getCalendar(rs.getString(START_ID));
+            Calendar end = CalHelper.getCalendar(rs.getString(END_ID));
+            String user = rs.getString(USER_ID);
+            String ip = rs.getString(IP_ID);
+            int port = rs.getInt(PORT_ID);
+            boolean status = rs.getBoolean(STATUS_ID);
+
+            tasks.add(new Task(title, start, end, user, ip, port, status));
+        }
+        ps.close();
+        rs.close();
+        return tasks;
+    }
+
+    public Events.ProjectOK assignUser(Events.Take inObj, String ip, int port) throws SQLException {
+        String sql = "UPDATE " +
+                TASKS_TABLE + " " +
+                "SET " +
+                USER_ID + " = ?, " +
+                IP_ID + " = ?, " +
+                PORT_ID + " = ?, " +
+                STATUS_ID + " = ? " +
+                "WHERE " +
+                PROJECT_ID + " = (SELECT " + PROJECT_ID + " FROM " + PROJECTS_TABLE + " WHERE " + TITLE_ID + " = ?) AND " +
+                TITLE_ID + " = ?";
+
+        // sql escape using PreparedStatement... prevent sql injection
+        PreparedStatement ps = mConnection.prepareStatement(sql);
+        ps.setString(1, inObj.getmUser());
+        ps.setString(2, ip);
+        ps.setInt(3, port);
+        ps.setString(4, Tags.WAITING_TAG);
+        ps.setString(5, inObj.getmProject());
+        ps.setString(6, inObj.getmTask());
+
+        int rows = ps.executeUpdate();
+        ps.close();
+
+        int status = (rows > 0) ? 0 : -1;
+        return new Events.ProjectOK(status);
+    }
+
+    /**
+     * Gets all the Projects saved in the database. The information returned only contains
+     * the titles of each Project.
+     *
+     * @return - string containing all the project titles separated by the ';' character
+     * @throws SQLException - raises exception if the SQL command was not able to execute
+     */
+    public Events.ProjectsAnswer getProjects() throws SQLException, ParseException {
+
+        // select all from the projects table
+        String sql = "SELECT * FROM " + PROJECTS_TABLE;
+
+        // sql escape using PreparedStatement. prevent sql injection
+        PreparedStatement ps = mConnection.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery();
+
+        // append the exam titles to a string, and get the count
+        String exams = "";
+        ArrayList<Project> projects = new ArrayList<>();
+        while (rs.next()) {
+            int projectId = rs.getInt(PROJECT_ID);
+            projects.add(new Project(rs.getString(TITLE_ID), getProjectTasks(projectId)));
+        }
+
+        // example output format: PROJECTS:2;Exam;Enigma
+        ps.close();
+        rs.close();
+        return new Events.ProjectsAnswer(projects);
     }
 }
